@@ -3,7 +3,7 @@ const mongoose=require('mongoose')
 
 const AnswerSchema=new mongoose.Schema({
     question_id:{
-        type:Number
+        type:String
     },
     answer:{
         type:String,

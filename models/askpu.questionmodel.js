@@ -1,12 +1,14 @@
 const mongoose=require('mongoose')
+const shortid = require('shortid');
 
 const QuestionSchema=new mongoose.Schema({
+    question_id: {
+        type: String,
+        default: shortid.generate,
+        unique: true
+    },
     question:{
         type:String
-    },
-    question_id:{
-        type:Number,
-        unique:true
     },
     ques_phone_no:{
         type:String

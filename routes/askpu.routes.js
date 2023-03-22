@@ -95,7 +95,6 @@ router.post('/questions',async(req,res) => {
         return res.status(400).json({ message: 'Question and phone number are required' });
     }
     const question_upload = new Questions({
-        question_id:req.body.question_id,
         question:req.body.question,
         ques_phone_no: req.body.ques_phone_no
     });
