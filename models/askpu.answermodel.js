@@ -3,7 +3,8 @@ const mongoose=require('mongoose')
 
 const AnswerSchema=new mongoose.Schema({
     question_id:{
-        type:String
+        type:String,
+        ref:'Questions'
     },
     answer:{
         type:String,
@@ -15,6 +16,17 @@ const AnswerSchema=new mongoose.Schema({
         type:Date,
         required:true,
         default:Date.now()
+    }
+});
+
+AnswerSchema.pre('save',async function(next){
+    const answer=this;
+    try{
+        const question=await mongoose.model('Questions').findOneAndUpdate(answer.question_id, {$inc: { answerCount:1 }})
+        next()
+    }
+    catch(err){
+        next(err)
     }
 })
 

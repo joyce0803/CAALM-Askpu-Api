@@ -1,5 +1,6 @@
 const express=require('express')
 const router=express.Router()
+const mongoose=require('mongoose')
 var bodyParser = require('body-parser')
 const Questions=require('../models/askpu.questionmodel')
 const Answers=require('../models/askpu.answermodel')
@@ -11,8 +12,47 @@ router.use( bodyParser.urlencoded({extended : true }));
 ////get all questions and answers
 router.get('/',async(req,res) => {
     try{
-        const question_list=await Questions.find()
-        const answer_list=await Answers.find()
+        const limit = req.query.limit ? parseInt(req.query.limit) : 10;
+        const question_list=await Questions.aggregate([
+            {
+                $lookup:{
+                    from:'answers',
+                    localField:'question_id',
+                    foreignField:'question_id',
+                    as:'answers'
+                }
+            },
+            {
+                $project:{
+                    _id:0,
+                    question_id:1,
+                    question:1,
+                    ques_phone_no:1,
+                    timestamp:1,
+                    is_faq:1,
+                    answerCount:{ $size: '$answers' }
+                }
+            },
+            {
+                $sort: { timestamp: -1 }
+            },
+            {
+                $limit: limit
+            }
+        ]);
+
+        const questionIds = question_list.map(q => q.question_id);
+        const answer_list=await Answers.aggregate([
+            {
+                $sort: { timestamp: -1 }
+            },
+            {
+                $match: {
+                  question_id: { $in: questionIds } 
+                }
+            }
+        ]);
+        // const questions_list=await Questions.find().populate('answers');
         const data= {
             questions:question_list,
             answers:answer_list
@@ -23,6 +63,7 @@ router.get('/',async(req,res) => {
         res.status(500).json({message:err.message})
     }
 })
+
 
 
 ///search ques ans
@@ -54,8 +95,29 @@ router.get('/search',async(req,res) => {
 ///get questions
 router.get('/questions',async(req,res) => {
     try{
-        const only_questions=await Questions.find()
-        res.status(200).json(only_questions)
+        const question_list=await Questions.aggregate([
+            {
+                $lookup:{
+                    from:'answers',
+                    localField:'question_id',
+                    foreignField:'question_id',
+                    as:'answers'
+                }
+            },
+            {
+                $project:{
+                    _id:0,
+                    question_id:1,
+                    question:1,
+                    ques_phone_no:1,
+                    timestamp:1,
+                    is_faq:1,
+                    answerCount:{ $size: '$answers' }
+                }
+            }
+        ]);
+        
+        res.status(200).json(question_list)
     }
     catch(err){
         res.status(500).json({message:err.message})
@@ -104,7 +166,7 @@ router.post('/questions',async(req,res) => {
     }
     catch(err){
         res.status(400).json({message:err.message})
-    }
+    } 
 })
 
 
@@ -128,6 +190,11 @@ router.post('/answers',checkQuestionExists,async(req,res) => {
 })
 
 
+////update is_faq
+// router.post('/questions/faq',async(req,res) => {
+
+// })
+
 
 ////update question
 router.patch('/questions/:question_id',updateQues,async(req,res) => {
@@ -139,6 +206,9 @@ router.patch('/questions/:question_id',updateQues,async(req,res) => {
     }
     if(req.body.ques_phone_no!=null){
         res.ques.ques_phone_no=req.body.ques_phone_no
+    }
+    if(req.body.is_faq!=null){
+        res.ques.is_faq=req.body.is_faq
     }
     try{
         const updatedQues=await res.ques.save()
@@ -204,21 +274,54 @@ async function getQuesAns(req,res,next){
     let ans
     let data
     try{
-        ques=await Questions.find({question_id:{$eq:req.params.question_id}})
+
+        ques=await Questions.aggregate([
+            {
+                
+                $lookup:{
+                    from:'answers',
+                    localField:'question_id',
+                    foreignField:'question_id',
+                    as:'answers'
+                }
+            },
+            {
+                $match:{
+                    question_id:req.params.question_id,
+                }
+            },
+            {
+                $project:{
+                    _id:0,
+                    question_id:1,
+                    question:1,
+                    ques_phone_no:1,
+                    timestamp:1,
+                    is_faq:1,
+                    answerCount:{ $size: '$answers' }
+                }
+            }
+        ]); 
+
+        // ques=await Questions.find({question_id:{$eq:req.params.question_id}})
         ans=await Answers.find({question_id:{$eq:req.params.question_id}})
+        
         if(ques==null || ans==null){
             return res.status(404).json({message:'No such question ID found'})
         }
+        
     }
-    catch(err){
+    catch(err){ 
         if(ques==undefined || ans==undefined){
             return res.status(404).json({message:'No such question exixts'})
         }
         return res.status(500).json({message:err.message})
     }
+    const answer_count=ans.length
     data={
-        question:ques,
-        answer:ans
+        questions:ques,
+        // answerCount:answer_count,
+        answers:ans
     }
     res.data=data
     next()
@@ -276,5 +379,7 @@ async function checkQuestionExists(req,res,next){
     }
     next()
 }
+
+
 
 module.exports=router

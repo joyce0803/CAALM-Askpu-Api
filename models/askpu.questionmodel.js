@@ -17,7 +17,21 @@ const QuestionSchema=new mongoose.Schema({
         type:Date,
         required:true,
         default:Date.now()
+    },
+    answerCount:{
+        type:Number,
+        default:0
+    },
+    is_faq:{
+        type:Boolean,
+        default:false
     }
+})
+
+QuestionSchema.virtual('answers',{
+    ref:'Answers',
+    localField:'question_id',
+    foreignField:'question_id'
 })
 
 
